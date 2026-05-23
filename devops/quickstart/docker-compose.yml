@@ -1,0 +1,56 @@
+services:
+
+  # ── 1. iii engine ────────────────────────────────────────────────────────────
+  iii-engine:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    volumes:
+      - engine-data:/app/data      # persist state store across restarts
+    ports:
+      - "3111:3111"                # HTTP API (internal — nginx proxies this)
+      - "49134:49134"              # WebSocket broker (workers connect here)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3111/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 2. caller-worker (TypeScript) ────────────────────────────────────────────
+  caller-worker:
+    build:
+      context: ./workers/caller-worker
+      dockerfile: Dockerfile
+    environment:
+      - III_URL=ws://iii-engine:49134   # Docker DNS resolves iii-engine
+    depends_on:
+      iii-engine:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── 3. inference-worker (Python + model) ─────────────────────────────────────
+  inference-worker:
+    build:
+      context: ./workers/inference-worker
+      dockerfile: Dockerfile
+    environment:
+      - III_URL=ws://iii-engine:49134   # Docker DNS resolves iii-engine
+    depends_on:
+      iii-engine:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── 4. gateway (nginx) ───────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"                    # only public-facing port
+    depends_on:
+      - iii-engine
+    restart: unless-stopped
+
+volumes:
+  engine-data:

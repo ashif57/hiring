@@ -1,6 +1,8 @@
 iii-sdk==0.11.0
 watchfiles
 transformers
-torch
+# CPU-only torch — avoids downloading 2GB of CUDA libraries
+# The gemma-3-270m model runs fine on CPU for this assignment
+torch --index-url https://download.pytorch.org/whl/cpu
 gguf
 accelerate

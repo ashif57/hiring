@@ -1,0 +1,54 @@
+# iii engine configuration — distributed deployment
+# Used by the iii-engine container / vm-engine VM.
+#
+# KEY CHANGES from config.yaml:
+#   1. host changed from 127.0.0.1 → 0.0.0.0
+#      Workers on other containers/VMs need to reach :3111 and :49134.
+#   2. inference-worker and caller-worker entries REMOVED.
+#      Both workers run in their own containers and connect via III_URL env var.
+#      The engine does not manage or start them — they self-register on connect.
+#
+# Docs: https://iii.dev/docs/how-to/configure-engine
+
+workers:
+  - name: iii-observability
+    config:
+      enabled: true
+      service_name: iii
+      exporter: memory
+      memory_max_spans: 10000
+      metrics_enabled: true
+      metrics_exporter: memory
+      logs_enabled: true
+      logs_exporter: memory
+      logs_console_output: true
+      sampling_ratio: 1.0
+
+  - name: iii-queue
+    config:
+      adapter:
+        name: builtin
+
+  - name: iii-state
+    config:
+      adapter:
+        name: kv
+        config:
+          store_method: file_based
+          file_path: ./data/state_store.db
+
+  - name: iii-http
+    config:
+      port: 3111
+      host: 0.0.0.0          # was 127.0.0.1 — must bind to all interfaces for cross-VM/container access
+      default_timeout: 30000
+      concurrency_request_limit: 1024
+      cors:
+        allowed_origins:
+          - '*'
+        allowed_methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
